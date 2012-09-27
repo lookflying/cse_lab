@@ -128,10 +128,10 @@ clean:
 	rm $(clean_files) -rf 
 
 handin_ignore=$(clean_files) core* *log
-handin_file=$(shell whoami)-lab$(LAB).tgz
+handin_file=$(shell whoami)-lab$(LAB)-112037xxxx.tgz
 labdir=$(shell basename $(PWD))
 handin: 
 	@if test -f stop.sh; then ./stop.sh > /dev/null 2>&1 | echo ""; fi
 	@bash -c "cd ../; tar -X <(tr ' ' '\n' < <(echo '$(handin_ignore)')) -czvf $(handin_file) $(labdir); mv $(handin_file) $(labdir); cd $(labdir)"
-	@echo Please email $(handin_file) to xiayubin@gmail.com
+	@echo Please change the name of $(handin_file) and email it to xiayubin@gmail.com
 	@echo Thanks!
