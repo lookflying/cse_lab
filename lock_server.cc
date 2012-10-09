@@ -10,7 +10,11 @@
 lock_server::lock_server():
   nacquire (0)
 {
-    pthread_mutex_init(&lock_map_mutex_, NULL);
+    VERIFY(pthread_mutex_init(&lock_map_mutex_, NULL) ==0 );
+}
+
+lock_server::~lock_server(){
+    VERIFY(pthread_mutex_destroy(&lock_map_mutex_) == 0);
 }
 
 lock_protocol::status
@@ -24,6 +28,7 @@ lock_server::stat(int clt, lock_protocol::lockid_t lid, int &r)
 
 lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r){
     lock_protocol::status ret = lock_protocol::OK;
+    printf("client %d acquire\n", clt);
     while (true){
         if (get_lock(clt, lid))
             break;
@@ -35,6 +40,7 @@ lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid,
 
 lock_protocol::status lock_server::release(int clt, lock_protocol::lockid_t lid, int &r){
     lock_protocol::status ret = lock_protocol::OK;
+    printf("client %d release\n", clt);
     if (drop_lock(clt, lid)){
         r = 0;
     }else{
