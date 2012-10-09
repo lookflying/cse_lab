@@ -13,12 +13,6 @@
 #include <pthread.h>
 typedef std::map<lock_protocol::lockid_t, int>::iterator lock_map_iterator;
 class lock_server {
-
-protected:
-    int nacquire;
-    pthread_mutex_t lock_map_mutex_;
-    std::map<lock_protocol::lockid_t, int> lock_map_;
-
 public:
     lock_server();
     ~lock_server();
@@ -28,6 +22,10 @@ public:
 private:
     bool get_lock(int clt, lock_protocol::lockid_t lid);
     bool drop_lock(int clt, lock_protocol::lockid_t lid);
+    int nacquire_;
+    pthread_mutex_t lock_map_mutex_;
+    pthread_cond_t  lock_cond_;
+    std::map<lock_protocol::lockid_t, int> lock_map_;
 };
 
 #endif 

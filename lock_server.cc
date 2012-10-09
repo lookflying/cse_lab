@@ -8,9 +8,10 @@
 #include <cstddef>
 
 lock_server::lock_server():
-  nacquire (0)
+  nacquire_ (0)
 {
     VERIFY(pthread_mutex_init(&lock_map_mutex_, NULL) ==0 );
+    VERIFY(pthread_cond_init(&lock_cond_, NULL) == 0);
 }
 
 lock_server::~lock_server(){
@@ -22,49 +23,66 @@ lock_server::stat(int clt, lock_protocol::lockid_t lid, int &r)
 {
   lock_protocol::status ret = lock_protocol::OK;
   printf("stat request from clt %d\n", clt);
-  r = nacquire;
+  r = nacquire_;
   return ret;
 }
 
 lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r){
     lock_protocol::status ret = lock_protocol::OK;
-    printf("client %d acquire\n", clt);
-    while (true){
-        if (get_lock(clt, lid))
-            break;
-        sleep(1);
+
+    printf("client %d acquire lock %ld\n", clt, lid);
+
+    pthread_mutex_lock(&lock_map_mutex_);
+    if (!get_lock(clt, lid)){
+        while (true){
+            pthread_cond_wait(&lock_cond_, &lock_map_mutex_);
+            if (get_lock(clt, lid))
+                break;
+        }
     }
+    pthread_mutex_unlock(&lock_map_mutex_);
+
+    printf("client %d acquire lock %ld success\n", clt, lid);
+
     r = 0;
     return ret;
 }
 
 lock_protocol::status lock_server::release(int clt, lock_protocol::lockid_t lid, int &r){
     lock_protocol::status ret = lock_protocol::OK;
-    printf("client %d release\n", clt);
+    printf("client %d release %ld\n", clt, lid);
+
+    pthread_mutex_lock(&lock_map_mutex_);
     if (drop_lock(clt, lid)){
         r = 0;
+        pthread_cond_signal(&lock_cond_);
     }else{
         r = -1;
+    }
+    pthread_mutex_unlock(&lock_map_mutex_);
+    if (r == 0){
+        printf("client %d release %ld success\n", clt, lid);
+    }else{
+        printf("client %d release %ld fail\n", clt, lid);
     }
     return ret;
 }
 
+//critical
 bool lock_server::get_lock(int clt, lock_protocol::lockid_t lid){
     bool rst = true;
-    pthread_mutex_lock(&lock_map_mutex_);
     lock_map_iterator it = lock_map_.find(lid);
     if (it == lock_map_.end()){
         lock_map_[lid] = clt;
     }else{
         rst = false;
     }
-    pthread_mutex_unlock(&lock_map_mutex_);
     return rst;
 }
 
+//critical area
 bool lock_server::drop_lock(int clt, lock_protocol::lockid_t lid){
     bool rst = true;
-    pthread_mutex_lock(&lock_map_mutex_);
     lock_map_iterator it = lock_map_.find(lid);
     if (it == lock_map_.end()){
         rst = false;
@@ -75,6 +93,5 @@ bool lock_server::drop_lock(int clt, lock_protocol::lockid_t lid){
             rst = false;
         }
     }
-    pthread_mutex_unlock(&lock_map_mutex_);
     return rst;
 }
