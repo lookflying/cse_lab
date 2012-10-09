@@ -666,29 +666,38 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
     }
     unsigned int lower_bound= reply_lower_bound[clt_nonce];
     unsigned int upper_bound = reply_upper_bound[clt_nonce];
-
-    if (reply_upper_bound.find(clt_nonce) == reply_upper_bound.end() || reply_upper_bound[clt_nonce] < xid){
-        reply_upper_bound[clt_nonce] = xid;
-    }
-
     std::map<unsigned int, std::list<reply_t> >::iterator it;
     std::list<reply_t>::iterator lit;
-    bool done = false;
-
     VERIFY((it = reply_window_.find(clt_nonce)) != reply_window_.end());
+    bool done = false;
     for (lit = it->second.begin(); lit != it->second.end(); lit++){
-        if ((*lit).xid == xid){
-            *b = (*lit).buf;
-            *sz = (*lit).sz;
-            done = true;
-            continue;
-        }
         if ((*lit).xid <= lower_bound){
             free((*lit).buf);
             it->second.erase(lit);
         }
     }
 
+    printf("good here 1\n");
+    fflush(stdout);
+
+
+    if (reply_upper_bound.find(clt_nonce) == reply_upper_bound.end() || reply_upper_bound[clt_nonce] < xid){
+        reply_upper_bound[clt_nonce] = xid;
+    }
+    printf("good here 2\n");
+    fflush(stdout);
+
+    for (lit = it->second.begin(); lit != it->second.end(); lit++){
+        if ((*lit).xid == xid){
+            *b = (*lit).buf;
+            *sz = (*lit).sz;
+            done = true;
+            break;
+        }
+    }
+
+    printf("good here 3\n");
+    fflush(stdout);
     if (xid <= lower_bound){
         return FORGOTTEN;
     }else if (xid > upper_bound){
@@ -715,6 +724,8 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
     rply.sz = sz;
     rply.cb_present = true;
     reply_window_[clt_nonce].push_back(rply);
+    printf("ok in add_reply\n");
+    fflush(stdout);
 }
 
 void
