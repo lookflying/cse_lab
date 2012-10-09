@@ -554,7 +554,7 @@ rpcs::dispatch(djob_t *j)
 		{
 			ScopedLock rwl(&reply_window_m_);
 			// if we don't know about this clt_nonce, create a cleanup object
-			if(reply_window_.find(h.clt_nonce) == reply_window_.end()){
+            if(reply_window_.find(h.clt_nonce) == reply_window_.end()){
 				VERIFY (reply_window_[h.clt_nonce].size() == 0); // create
 				jsl_log(JSL_DBG_2,
 						"rpcs::dispatch: new client %u xid %d chan %d, total clients %d\n", 
@@ -661,9 +661,43 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 		unsigned int xid_rep, char **b, int *sz)
 {
 	ScopedLock rwl(&reply_window_m_);
+    if (reply_lower_bound.find(clt_nonce) == reply_lower_bound.end() || reply_lower_bound[clt_nonce] < xid_rep){
+        reply_lower_bound[clt_nonce] = xid_rep;
+    }
+    unsigned int lower_bound= reply_lower_bound[clt_nonce];
+    unsigned int upper_bound = reply_upper_bound[clt_nonce];
 
-        // You fill this in for Lab 1.
-	return NEW;
+    if (reply_upper_bound.find(clt_nonce) == reply_upper_bound.end() || reply_upper_bound[clt_nonce] < xid){
+        reply_upper_bound[clt_nonce] = xid;
+    }
+
+    std::map<unsigned int, std::list<reply_t> >::iterator it;
+    std::list<reply_t>::iterator lit;
+    bool done = false;
+
+    VERIFY((it = reply_window_.find(clt_nonce)) != reply_window_.end());
+    for (lit = it->second.begin(); lit != it->second.end(); lit++){
+        if ((*lit).xid == xid){
+            *b = (*lit).buf;
+            *sz = (*lit).sz;
+            done = true;
+            continue;
+        }
+        if ((*lit).xid <= lower_bound){
+            free((*lit).buf);
+            it->second.erase(lit);
+        }
+    }
+
+    if (xid <= lower_bound){
+        return FORGOTTEN;
+    }else if (xid > upper_bound){
+        return NEW;
+    }else if (done){
+        return DONE;
+    }else{
+        return INPROGRESS;
+    }
 }
 
 // rpcs::dispatch calls add_reply when it is sending a reply to an RPC,
@@ -676,7 +710,11 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 		char *b, int sz)
 {
 	ScopedLock rwl(&reply_window_m_);
-        // You fill this in for Lab 1.
+    reply_t rply(xid);
+    rply.buf = b;
+    rply.sz = sz;
+    rply.cb_present = true;
+    reply_window_[clt_nonce].push_back(rply);
 }
 
 void
