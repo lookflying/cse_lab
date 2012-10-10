@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <list>
 #include <map>
+#include <set>
 #include <stdio.h>
 
 #include "thr_pool.h"
@@ -299,7 +300,7 @@ class rpcs : public chanmgr {
         // indexed by client nonce.
 	std::map<unsigned int, std::list<reply_t> > reply_window_;
     std::map<unsigned int, unsigned int> reply_lower_bound;
-    std::map<unsigned int, unsigned int> reply_upper_bound;
+    std::map<unsigned int, std::set<unsigned int> > reply_set_;
 
 	void free_reply_window(void);
 	void add_reply(unsigned int clt_nonce, unsigned int xid, char *b, int sz);

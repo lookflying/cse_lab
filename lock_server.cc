@@ -36,6 +36,7 @@ lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid,
     if (!get_lock(clt, lid)){
         while (true){
             pthread_cond_wait(&lock_cond_, &lock_map_mutex_);
+            printf("client %d acquire lock %ld\n", clt, lid);
             if (get_lock(clt, lid))
                 break;
         }
@@ -55,9 +56,11 @@ lock_protocol::status lock_server::release(int clt, lock_protocol::lockid_t lid,
     pthread_mutex_lock(&lock_map_mutex_);
     if (drop_lock(clt, lid)){
         r = 0;
+
         pthread_cond_signal(&lock_cond_);
     }else{
         r = -1;
+
     }
     pthread_mutex_unlock(&lock_map_mutex_);
     if (r == 0){

@@ -484,10 +484,10 @@ rpcs::updatestat(unsigned int proc)
 		std::map<unsigned int,std::list<reply_t> >::iterator clt;
 
 		unsigned int totalrep = 0, maxrep = 0;
-		for (clt = reply_window_.begin(); clt != reply_window_.end(); clt++){
+        for (clt = reply_window_.begin(); clt != reply_window_.end(); clt++){
 			totalrep += clt->second.size();
 			if(clt->second.size() > maxrep)
-				maxrep = clt->second.size();
+                maxrep = clt->second.size();
 		}
 		jsl_log(JSL_DBG_1, "REPLY WINDOW: clients %d total reply %d max per client %d\n", 
                         (int) reply_window_.size(), totalrep, maxrep);
@@ -575,7 +575,7 @@ rpcs::dispatch(djob_t *j)
 			}
 		}
 
-		stat = checkduplicate_and_update(h.clt_nonce, h.xid,
+        stat =   checkduplicate_and_update(h.clt_nonce, h.xid,
                                                  h.xid_rep, &b1, &sz1);
 	} else {
 		// this client does not require at most once logic
@@ -661,52 +661,73 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 		unsigned int xid_rep, char **b, int *sz)
 {
 	ScopedLock rwl(&reply_window_m_);
+    bool old = false;
     if (reply_lower_bound.find(clt_nonce) == reply_lower_bound.end() || reply_lower_bound[clt_nonce] < xid_rep){
         reply_lower_bound[clt_nonce] = xid_rep;
     }
     unsigned int lower_bound= reply_lower_bound[clt_nonce];
-    unsigned int upper_bound = reply_upper_bound[clt_nonce];
-    std::map<unsigned int, std::list<reply_t> >::iterator it;
-    std::list<reply_t>::iterator lit;
-    VERIFY((it = reply_window_.find(clt_nonce)) != reply_window_.end());
+    std::map<unsigned int, std::set<unsigned int> >::iterator set_map_it;
+    std::set<unsigned int>::iterator set_it;
+    if ((set_map_it = reply_set_.find(clt_nonce)) == reply_set_.end()){
+        reply_set_[clt_nonce].insert(xid);
+        printf(" clt %u, xid %u, rep %u NEW low %d\n", clt_nonce, xid, xid_rep, lower_bound);
+        fflush(stdout);
+        return NEW;
+    }else{
+        set_it = set_map_it->second.find(xid);
+        if (set_it == set_map_it->second.end()){
+            set_map_it->second.insert(xid);
+            printf(" clt %u, xid %u, rep %u NEW low %d\n", clt_nonce, xid, xid_rep, lower_bound);
+            fflush(stdout);
+            return NEW;
+        }else{
+            old = true;
+        }
+    }
+    std::map<unsigned int, std::list<reply_t> >::iterator window_it;
+    std::list<reply_t>::iterator list_it;
+    VERIFY((window_it = reply_window_.find(clt_nonce)) != reply_window_.end());
     bool done = false;
-    for (lit = it->second.begin(); lit != it->second.end(); lit++){
-        if ((*lit).xid <= lower_bound){
-            free((*lit).buf);
-            it->second.erase(lit);
+    for (list_it = window_it->second.begin(); list_it != window_it->second.end(); ){
+        if ((*list_it).xid <= lower_bound){
+            free((*list_it).buf);
+            window_it->second.erase(list_it++);
+        }else{
+            list_it++;
         }
     }
 
-    printf("good here 1\n");
-    fflush(stdout);
-
-
-    if (reply_upper_bound.find(clt_nonce) == reply_upper_bound.end() || reply_upper_bound[clt_nonce] < xid){
-        reply_upper_bound[clt_nonce] = xid;
+    //remove forgotten record from reply_set_
+    if ((set_it = set_map_it->second.find(xid_rep)) != set_map_it->second.end()){
+        set_map_it->second.erase(set_map_it->second.begin(), set_it);
     }
-    printf("good here 2\n");
-    fflush(stdout);
 
-    for (lit = it->second.begin(); lit != it->second.end(); lit++){
-        if ((*lit).xid == xid){
-            *b = (*lit).buf;
-            *sz = (*lit).sz;
+    for (list_it = window_it->second.begin(); list_it != window_it->second.end(); list_it++){
+        if ((*list_it).xid == xid){
+            *b = (*list_it).buf;
+            *sz = (*list_it).sz;
             done = true;
             break;
         }
     }
 
-    printf("good here 3\n");
-    fflush(stdout);
+
     if (xid <= lower_bound){
+        printf(" clt %u, xid %u, rep %u FORGOTTON  low %d \n", clt_nonce, xid, xid_rep, lower_bound);
+        fflush(stdout);
         return FORGOTTEN;
-    }else if (xid > upper_bound){
-        return NEW;
     }else if (done){
+        printf(" clt %u, xid %u, rep %u DONE low %d \n", clt_nonce, xid, xid_rep, lower_bound);
+        fflush(stdout);
         return DONE;
-    }else{
+    }else if (old){
+        printf(" clt %u, xid %u, rep %u INPROGROSS low %d \n", clt_nonce, xid, xid_rep, lower_bound);
+        fflush(stdout);
         return INPROGRESS;
     }
+    printf(" clt %u, xid %u, rep %u NEW low %d \n", clt_nonce, xid, xid_rep, lower_bound);
+    fflush(stdout);
+    return NEW;
 }
 
 // rpcs::dispatch calls add_reply when it is sending a reply to an RPC,
@@ -726,7 +747,7 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
     rply.sz = sz;
     rply.cb_present = true;
     reply_window_[clt_nonce].push_back(rply);
-    printf("ok in add_reply\n");
+    printf("reply for clt %u xid %u is ok\n", clt_nonce, xid);
     fflush(stdout);
 }
 
