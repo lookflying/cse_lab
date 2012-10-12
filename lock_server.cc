@@ -60,6 +60,7 @@ lock_protocol::status lock_server::release(int clt, lock_protocol::lockid_t lid,
         pthread_cond_signal(&lock_cond_);
     }else{
         r = -1;
+        ret = lock_protocol::NOENT;
 
     }
     pthread_mutex_unlock(&lock_map_mutex_);

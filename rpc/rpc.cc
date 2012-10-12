@@ -741,9 +741,7 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 {
 	ScopedLock rwl(&reply_window_m_);
     reply_t rply(xid);
-    rply.buf = (char *) malloc(sizeof(char) * sz);
-    VERIFY(rply.buf != NULL);
-    memcpy(rply.buf, b, sz);
+    rply.buf = b;
     rply.sz = sz;
     rply.cb_present = true;
     reply_window_[clt_nonce].push_back(rply);
