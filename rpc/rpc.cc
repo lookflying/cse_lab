@@ -662,72 +662,64 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 {
 	ScopedLock rwl(&reply_window_m_);
     bool old = false;
-    if (reply_lower_bound.find(clt_nonce) == reply_lower_bound.end() || reply_lower_bound[clt_nonce] < xid_rep){
-        reply_lower_bound[clt_nonce] = xid_rep;
-    }
-    unsigned int lower_bound= reply_lower_bound[clt_nonce];
-    std::map<unsigned int, std::set<unsigned int> >::iterator set_map_it;
-    std::set<unsigned int>::iterator set_it;
-    if ((set_map_it = reply_set_.find(clt_nonce)) == reply_set_.end()){
-        reply_set_[clt_nonce].insert(xid);
-        printf(" clt %u, xid %u, rep %u NEW low %d\n", clt_nonce, xid, xid_rep, lower_bound);
-        fflush(stdout);
-        return NEW;
-    }else{
-        set_it = set_map_it->second.find(xid);
-        if (set_it == set_map_it->second.end()){
-            set_map_it->second.insert(xid);
-            printf(" clt %u, xid %u, rep %u NEW low %d\n", clt_nonce, xid, xid_rep, lower_bound);
-            fflush(stdout);
-            return NEW;
-        }else{
-            old = true;
-        }
-    }
-    std::map<unsigned int, std::list<reply_t> >::iterator window_it;
-    std::list<reply_t>::iterator list_it;
-    VERIFY((window_it = reply_window_.find(clt_nonce)) != reply_window_.end());
     bool done = false;
-    for (list_it = window_it->second.begin(); list_it != window_it->second.end(); ){
-        if ((*list_it).xid <= lower_bound){
-            free((*list_it).buf);
-            window_it->second.erase(list_it++);
-        }else{
-            list_it++;
+    std::list<reply_t>::iterator reply_list_it;
+    std::set<unsigned int>::iterator set_it;
+
+    if (reply_lower_bound_.find(clt_nonce) == reply_lower_bound_.end()){
+        reply_lower_bound_[clt_nonce] = xid_rep;
+    }else{
+        if (reply_lower_bound_[clt_nonce] < xid_rep){
+            reply_lower_bound_[clt_nonce] = xid_rep;
+            VERIFY(reply_window_.find(clt_nonce) != reply_window_.end());
+            //the list was sorted in add_reply
+            while(reply_window_[clt_nonce].size() > 0 && reply_window_[clt_nonce].front().xid <= xid_rep){
+                free(reply_window_[clt_nonce].front().buf);
+                reply_window_[clt_nonce].pop_front();
+            }
+            VERIFY(reply_set_.find(clt_nonce)!= reply_set_.end());
+            if (xid_rep > 0){
+                //if not forgotten or done, should clean
+                if ((set_it = reply_set_[clt_nonce].find(xid_rep)) != reply_set_[clt_nonce].end()){
+                    reply_set_[clt_nonce].erase(reply_set_[clt_nonce].begin(), set_it);
+                }
+            }
         }
     }
 
-    //remove forgotten record from reply_set_
-    if ((set_it = set_map_it->second.find(xid_rep)) != set_map_it->second.end()){
-        set_map_it->second.erase(set_map_it->second.begin(), set_it);
+    if (reply_set_.find(clt_nonce) == reply_set_.end()){
+        VERIFY(reply_set_[clt_nonce].size() == 0);
+        reply_set_[clt_nonce].insert(xid);
+    }else if (reply_set_[clt_nonce].find(xid) == reply_set_[clt_nonce].end()){
+        reply_set_[clt_nonce].insert(xid);
+    }else{
+        old = true;
     }
 
-    for (list_it = window_it->second.begin(); list_it != window_it->second.end(); list_it++){
-        if ((*list_it).xid == xid){
-            *b = (*list_it).buf;
-            *sz = (*list_it).sz;
-            done = true;
-            break;
+
+    if (reply_window_.find(clt_nonce) != reply_window_.end()){
+        for (reply_list_it = reply_window_[clt_nonce].begin();
+             reply_list_it != reply_window_[clt_nonce].end();
+             reply_list_it++){
+            if (reply_list_it->xid == xid){
+                *b = reply_list_it->buf;
+                *sz = reply_list_it->sz;
+                done = true;
+                break;
+            }
         }
     }
 
-
-    if (xid <= lower_bound){
-        printf(" clt %u, xid %u, rep %u FORGOTTON  low %d \n", clt_nonce, xid, xid_rep, lower_bound);
-        fflush(stdout);
-        return FORGOTTEN;
-    }else if (done){
-        printf(" clt %u, xid %u, rep %u DONE low %d \n", clt_nonce, xid, xid_rep, lower_bound);
-        fflush(stdout);
+    if (done){
         return DONE;
-    }else if (old){
-        printf(" clt %u, xid %u, rep %u INPROGROSS low %d \n", clt_nonce, xid, xid_rep, lower_bound);
-        fflush(stdout);
+    }else if(old){
         return INPROGRESS;
+    }else if(xid <= reply_lower_bound_[clt_nonce]){
+        return FORGOTTEN;
+    }else{
+        return NEW;
     }
-    printf(" clt %u, xid %u, rep %u NEW low %d \n", clt_nonce, xid, xid_rep, lower_bound);
-    fflush(stdout);
-    return NEW;
+
 }
 
 // rpcs::dispatch calls add_reply when it is sending a reply to an RPC,
@@ -741,12 +733,25 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 {
 	ScopedLock rwl(&reply_window_m_);
     reply_t rply(xid);
+    std::list<reply_t>::iterator list_it;
+    bool added = false;
     rply.buf = b;
     rply.sz = sz;
     rply.cb_present = true;
-    reply_window_[clt_nonce].push_back(rply);
-    printf("reply for clt %u xid %u is ok\n", clt_nonce, xid);
-    fflush(stdout);
+    //sort when adding
+    VERIFY(reply_window_.find(clt_nonce) != reply_window_.end());
+    for (list_it = reply_window_[clt_nonce].begin(); list_it != reply_window_[clt_nonce].end();list_it++){
+        if (list_it->xid < xid){
+            continue;
+        }else{
+            VERIFY(list_it->xid != xid);
+            reply_window_[clt_nonce].insert(list_it, rply);
+            added = true;
+            break;
+        }
+    }
+    if (!added)
+        reply_window_[clt_nonce].push_back(rply);
 }
 
 void
@@ -758,7 +763,7 @@ rpcs::free_reply_window(void)
 	ScopedLock rwl(&reply_window_m_);
 	for (clt = reply_window_.begin(); clt != reply_window_.end(); clt++){
 		for (it = clt->second.begin(); it != clt->second.end(); it++){
-			free((*it).buf);
+            free((*it).buf);
 		}
 		clt->second.clear();
 	}

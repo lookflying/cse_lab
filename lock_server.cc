@@ -30,20 +30,20 @@ lock_server::stat(int clt, lock_protocol::lockid_t lid, int &r)
 lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r){
     lock_protocol::status ret = lock_protocol::OK;
 
-    printf("client %d acquire lock %ld\n", clt, lid);
+//    printf("client %d acquire lock %ld\n", clt, lid);
 
     pthread_mutex_lock(&lock_map_mutex_);
     if (!get_lock(clt, lid)){
         while (true){
             pthread_cond_wait(&lock_cond_, &lock_map_mutex_);
-            printf("client %d acquire lock %ld\n", clt, lid);
+//            printf("client %d acquire lock %ld\n", clt, lid);
             if (get_lock(clt, lid))
                 break;
         }
     }
     pthread_mutex_unlock(&lock_map_mutex_);
 
-    printf("client %d acquire lock %ld success\n", clt, lid);
+//    printf("client %d acquire lock %ld success\n", clt, lid);
 
     r = 0;
     return ret;
@@ -56,19 +56,17 @@ lock_protocol::status lock_server::release(int clt, lock_protocol::lockid_t lid,
     pthread_mutex_lock(&lock_map_mutex_);
     if (drop_lock(clt, lid)){
         r = 0;
-
         pthread_cond_signal(&lock_cond_);
     }else{
         r = -1;
-        ret = lock_protocol::NOENT;
-
+        ret = lock_protocol::RETRY;
     }
     pthread_mutex_unlock(&lock_map_mutex_);
-    if (r == 0){
-        printf("client %d release %ld success\n", clt, lid);
-    }else{
-        printf("client %d release %ld fail\n", clt, lid);
-    }
+//    if (r == 0){
+//        printf("client %d release %ld success\n", clt, lid);
+//    }else{
+//        printf("client %d release %ld fail\n", clt, lid);
+//    }
     return ret;
 }
 

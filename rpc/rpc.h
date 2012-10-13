@@ -299,7 +299,7 @@ class rpcs : public chanmgr {
 	// per client that that client hasn't acknowledged receiving yet.
         // indexed by client nonce.
 	std::map<unsigned int, std::list<reply_t> > reply_window_;
-    std::map<unsigned int, unsigned int> reply_lower_bound;
+    std::map<unsigned int, unsigned int> reply_lower_bound_;
     std::map<unsigned int, std::set<unsigned int> > reply_set_;
 
 	void free_reply_window(void);

@@ -3,14 +3,11 @@ CONFIG += console
 CONFIG -= qt
 
 SOURCES += \
-    lock_tester.cc \
     lock_smain.cc \
     lock_server.cc \
-    lock_demo.cc \
     lock_client.cc \
     gettime.cc \
     rpc/thr_pool.cc \
-    rpc/rpctest.cc \
     rpc/rpc.cc \
     rpc/pollmgr.cc \
     rpc/jsl_log.cc \
@@ -36,3 +33,5 @@ HEADERS += \
     lang/verify.h \
     lang/algorithm.h
 
+INCLUDEPATH += rpc lang
+LIBS += -lrt -pthread
