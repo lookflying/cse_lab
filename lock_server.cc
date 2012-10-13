@@ -51,7 +51,7 @@ lock_protocol::status lock_server::acquire(int clt, lock_protocol::lockid_t lid,
 
 lock_protocol::status lock_server::release(int clt, lock_protocol::lockid_t lid, int &r){
     lock_protocol::status ret = lock_protocol::OK;
-    printf("client %d release %ld\n", clt, lid);
+//    printf("client %d release %ld\n", clt, lid);
 
     pthread_mutex_lock(&lock_map_mutex_);
     if (drop_lock(clt, lid)){
