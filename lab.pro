@@ -34,4 +34,4 @@ HEADERS += \
     lang/algorithm.h
 
 INCLUDEPATH += rpc lang
-LIBS += -lrt -pthread
+LIBS += -lrt -lpthread

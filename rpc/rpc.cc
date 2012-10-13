@@ -673,7 +673,7 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
             reply_lower_bound_[clt_nonce] = xid_rep;
             VERIFY(reply_window_.find(clt_nonce) != reply_window_.end());
             //the list was sorted in add_reply
-            while(reply_window_[clt_nonce].size() > 0 && reply_window_[clt_nonce].front().xid <= xid_rep){
+            while(reply_window_[clt_nonce].size() > 0 && reply_window_[clt_nonce].front().xid < xid_rep){
                 free(reply_window_[clt_nonce].front().buf);
                 reply_window_[clt_nonce].pop_front();
             }
