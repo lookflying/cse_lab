@@ -3,7 +3,6 @@ CONFIG += console
 CONFIG -= qt
 
 SOURCES += \
-    lock_smain.cc \
     lock_server.cc \
     lock_client.cc \
     gettime.cc \
@@ -11,7 +10,11 @@ SOURCES += \
     rpc/rpc.cc \
     rpc/pollmgr.cc \
     rpc/jsl_log.cc \
-    rpc/connection.cc
+    rpc/connection.cc \
+    yfs_client.cc \
+    extent_server.cc \
+    extent_client.cc \
+    fuse.cc
 
 OTHER_FILES += \
     GNUmakefile
@@ -31,7 +34,13 @@ HEADERS += \
     rpc/fifo.h \
     rpc/connection.h \
     lang/verify.h \
-    lang/algorithm.h
+    lang/algorithm.h \
+    yfs_client.h \
+    extent_server.h \
+    extent_protocol.h \
+    extent_client.h
 
 INCLUDEPATH += rpc lang
 LIBS += -lrt -pthread
+
+
