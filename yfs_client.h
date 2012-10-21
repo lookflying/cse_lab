@@ -36,7 +36,7 @@ private:
     static std::string name(inum);
     static inum n2i(std::string);
     static const char delimiter = ':';
-    static const char entry_delimiter = '/';
+    static const char entry_delimiter = '\n';
     static std::string to_dir_entry(std::string name, inum i_num);
     static void to_name_inum(std::string dir_entry, std::string &name, inum &i_num);
     static void get_dir_entries(std::string content, std::map<std::string, inum> &entries);

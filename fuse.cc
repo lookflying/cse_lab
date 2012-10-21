@@ -125,11 +125,11 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
   if (FUSE_SET_ATTR_SIZE & to_set) {
     printf("   fuseserver_setattr set size to %zu\n", attr->st_size);
     struct stat st;
-    fuseserver_getattr(req, ino, fi);
 #if 1
 
     yfs->resize(static_cast<yfs_client::inum>(ino), attr->st_size);
     getattr(static_cast<yfs_client::inum>(ino), st);
+
     fuse_reply_attr(req, &st, 0);
 #else
     fuse_reply_err(req, ENOSYS);
@@ -231,8 +231,9 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
         if((ret = yfs->create_file(static_cast<yfs_client::inum>(parent), name, i_num)) == yfs_client::OK){
             e->ino = static_cast<fuse_ino_t>(i_num);
             ret = getattr(i_num, e->attr);
-            if (ret != yfs_client::OK)
+            if (ret != yfs_client::OK){
                 return ret;
+            }
         }else{
             return ret;
         }

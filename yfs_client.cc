@@ -128,7 +128,6 @@ int
 yfs_client::getdir(inum inum, dirinfo &din)
 {
   int r = OK;
-
   printf("getdir %016llx\n", inum);
   extent_protocol::attr a;
   if (ec->getattr(inum, a) != extent_protocol::OK) {
@@ -167,9 +166,12 @@ int yfs_client::create_file(inum parent, std::string name, inum &i_num){
     i_num = 0x80000000;
     int ret;
     int r = static_cast<int>(i_num);
+//    i_num = (static_cast<inum>(rand() & 0x7fffffff) | 0x80000000);
     if ((ret = ec->put(i_num, std::string(), r)) != extent_protocol::OK)
         return IOERR;
     i_num = static_cast<inum>(static_cast<unsigned int>(r));
+    inum re = static_cast<inum>(static_cast<unsigned int>(r));
+    printf("create\nset %016llx\nget %016llx\n", i_num, re);
     if (i_num == 0x80000000){
         return IOERR;
     }else{
@@ -229,8 +231,9 @@ int yfs_client::resize(inum i_num, size_t size){
     int ret = yfs_client::OK;
     fileinfo fi;
     if (size == 0){
-        if (ec->put(i_num, std::string()) != extent_protocol::OK)
+        if (ec->put(i_num, "") != extent_protocol::OK){
             return IOERR;
+        }
     }else{
         if ((ret = getfile(i_num, fi) != extent_protocol::OK))
                 return ret;
@@ -259,5 +262,5 @@ int yfs_client::resize(inum i_num, size_t size){
             return ret;
         }
     }
-    return IOERR;
+    return ret;
 }

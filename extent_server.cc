@@ -25,7 +25,7 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int & r)
 
         do{
 #if RAND_MAX == 2147483647
-            id = (rand() & 0x7ffffffff) | (id & 0x80000000);
+            id = (rand() & 0x7fffffff) | (id & 0x80000000);
 #else
             id = (((rand() & 0x7fff) << 16) | (rand() & 0xffff)) | (id & 0x80000000);
 #endif
@@ -35,7 +35,6 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int & r)
 		old = false;
 	}
      r = static_cast<int>(id);
-     printf("sizeof int = %u\n", sizeof(r));
 	data_[id] = buf;
     unsigned int t = static_cast<unsigned int>(time(NULL));
 	if (!old){
