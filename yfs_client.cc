@@ -170,7 +170,7 @@ int yfs_client::create_file(inum parent, std::string name, inum &i_num){
     if ((ret = ec->put(i_num, std::string(), r)) != extent_protocol::OK)
         return IOERR;
     i_num = static_cast<inum>(static_cast<unsigned int>(r));
-    inum re = static_cast<inum>(static_cast<unsigned int>(r));
+//    inum re = static_cast<inum>(static_cast<unsigned int>(r));
 //    printf("create\nset %016llx\nget %016llx\n", i_num, re);
     if (i_num == 0x80000000){
         return IOERR;
