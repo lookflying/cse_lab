@@ -484,10 +484,10 @@ rpcs::updatestat(unsigned int proc)
 		std::map<unsigned int,std::list<reply_t> >::iterator clt;
 
 		unsigned int totalrep = 0, maxrep = 0;
-		for (clt = reply_window_.begin(); clt != reply_window_.end(); clt++){
+        for (clt = reply_window_.begin(); clt != reply_window_.end(); clt++){
 			totalrep += clt->second.size();
 			if(clt->second.size() > maxrep)
-				maxrep = clt->second.size();
+                maxrep = clt->second.size();
 		}
 		jsl_log(JSL_DBG_1, "REPLY WINDOW: clients %d total reply %d max per client %d\n", 
                         (int) reply_window_.size(), totalrep, maxrep);
@@ -554,7 +554,7 @@ rpcs::dispatch(djob_t *j)
 		{
 			ScopedLock rwl(&reply_window_m_);
 			// if we don't know about this clt_nonce, create a cleanup object
-			if(reply_window_.find(h.clt_nonce) == reply_window_.end()){
+            if(reply_window_.find(h.clt_nonce) == reply_window_.end()){
 				VERIFY (reply_window_[h.clt_nonce].size() == 0); // create
 				jsl_log(JSL_DBG_2,
 						"rpcs::dispatch: new client %u xid %d chan %d, total clients %d\n", 
@@ -575,7 +575,7 @@ rpcs::dispatch(djob_t *j)
 			}
 		}
 
-		stat = checkduplicate_and_update(h.clt_nonce, h.xid,
+        stat =   checkduplicate_and_update(h.clt_nonce, h.xid,
                                                  h.xid_rep, &b1, &sz1);
 	} else {
 		// this client does not require at most once logic
@@ -661,9 +661,65 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 		unsigned int xid_rep, char **b, int *sz)
 {
 	ScopedLock rwl(&reply_window_m_);
+    bool old = false;
+    bool done = false;
+    std::list<reply_t>::iterator reply_list_it;
+    std::set<unsigned int>::iterator set_it;
 
-        // You fill this in for Lab 1.
-	return NEW;
+    if (reply_lower_bound_.find(clt_nonce) == reply_lower_bound_.end()){
+        reply_lower_bound_[clt_nonce] = xid_rep;
+    }else{
+        if (reply_lower_bound_[clt_nonce] < xid_rep){
+            reply_lower_bound_[clt_nonce] = xid_rep;
+            VERIFY(reply_window_.find(clt_nonce) != reply_window_.end());
+            //the list was sorted in add_reply
+            while(reply_window_[clt_nonce].size() > 0 && reply_window_[clt_nonce].front().xid <= xid_rep){
+                free(reply_window_[clt_nonce].front().buf);
+                reply_window_[clt_nonce].pop_front();
+            }
+            VERIFY(reply_set_.find(clt_nonce)!= reply_set_.end());
+            if (xid_rep > 0){
+                //if not forgotten or done, should clean
+                if ((set_it = reply_set_[clt_nonce].find(xid_rep)) != reply_set_[clt_nonce].end()){
+                    reply_set_[clt_nonce].erase(reply_set_[clt_nonce].begin(), set_it);
+                }
+            }
+        }
+    }
+
+    if (reply_set_.find(clt_nonce) == reply_set_.end()){
+        VERIFY(reply_set_[clt_nonce].size() == 0);
+        reply_set_[clt_nonce].insert(xid);
+    }else if (reply_set_[clt_nonce].find(xid) == reply_set_[clt_nonce].end()){
+        reply_set_[clt_nonce].insert(xid);
+    }else{
+        old = true;
+    }
+
+
+    if (reply_window_.find(clt_nonce) != reply_window_.end()){
+        for (reply_list_it = reply_window_[clt_nonce].begin();
+             reply_list_it != reply_window_[clt_nonce].end();
+             reply_list_it++){
+            if (reply_list_it->xid == xid){
+                *b = reply_list_it->buf;
+                *sz = reply_list_it->sz;
+                done = true;
+                break;
+            }
+        }
+    }
+
+    if (done){
+        return DONE;
+    }else if(old){
+        return INPROGRESS;
+    }else if(xid <= reply_lower_bound_[clt_nonce]){
+        return FORGOTTEN;
+    }else{
+        return NEW;
+    }
+
 }
 
 // rpcs::dispatch calls add_reply when it is sending a reply to an RPC,
@@ -676,7 +732,26 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 		char *b, int sz)
 {
 	ScopedLock rwl(&reply_window_m_);
-        // You fill this in for Lab 1.
+    reply_t rply(xid);
+    std::list<reply_t>::iterator list_it;
+    bool added = false;
+    rply.buf = b;
+    rply.sz = sz;
+    rply.cb_present = true;
+    //sort when adding
+    VERIFY(reply_window_.find(clt_nonce) != reply_window_.end());
+    for (list_it = reply_window_[clt_nonce].begin(); list_it != reply_window_[clt_nonce].end();list_it++){
+        if (list_it->xid < xid){
+            continue;
+        }else{
+            VERIFY(list_it->xid != xid);
+            reply_window_[clt_nonce].insert(list_it, rply);
+            added = true;
+            break;
+        }
+    }
+    if (!added)
+        reply_window_[clt_nonce].push_back(rply);
 }
 
 void
@@ -688,7 +763,7 @@ rpcs::free_reply_window(void)
 	ScopedLock rwl(&reply_window_m_);
 	for (clt = reply_window_.begin(); clt != reply_window_.end(); clt++){
 		for (it = clt->second.begin(); it != clt->second.end(); it++){
-			free((*it).buf);
+            free((*it).buf);
 		}
 		clt->second.clear();
 	}
