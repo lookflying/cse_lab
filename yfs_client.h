@@ -59,6 +59,9 @@ public:
     int write_file(inum i_num, std::string buf, off_t off, size_t &size);
     int read_dir(inum i_num, std::map<std::string, inum> &entries);
     int resize(inum i_num, size_t size);
+	int mkdir(inum parent, std::string name, inum &i_num);
+	int unlink(inum parent, std::string name); 
+
 };
 
 #endif 

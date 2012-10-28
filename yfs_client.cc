@@ -13,19 +13,20 @@
 
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst)
 {
-  ec = new extent_client(extent_dst);
-  std::string buf;
-  extent_protocol::extentid_t rootid = 0x00000001;
-  extent_protocol::status s = ec->get(rootid, buf);
-  if (s == extent_protocol::NOENT){
-      std::ostringstream rootcontent;
-      rootcontent << '.';
-      rootcontent << delimiter;
-      rootcontent << rootid << entry_delimiter;
-      VERIFY(ec->put(rootid, rootcontent.str()) == extent_protocol::OK);
-  }else{
-      VERIFY(s == extent_protocol::OK);
-  }
+	ec = new extent_client(extent_dst);
+	std::string buf;
+	extent_protocol::extentid_t rootid = 0x00000001;
+	extent_protocol::status s = ec->get(rootid, buf);
+	if (s == extent_protocol::NOENT){
+//      std::ostringstream rootcontent;
+//      rootcontent << '.';
+//      rootcontent << delimiter;
+//      rootcontent << rootid << entry_delimiter;
+//      VERIFY(ec->put(rootid, rootcontent.str()) == extent_protocol::OK);
+	VERIFY(ec->put(rootid, std::string()) == extent_protocol::OK);
+	}else{
+		VERIFY(s == extent_protocol::OK);
+	}
 
 }
 
@@ -170,28 +171,45 @@ int yfs_client::look_up_by_name(inum parent, std::string name, inum &i_num){
 
 int yfs_client::create_file(inum parent, std::string name, inum &i_num){
     i_num = 0x80000000;
-    int ret;
     int r = static_cast<int>(i_num);
-//    i_num = (static_cast<inum>(rand() & 0x7fffffff) | 0x80000000);
-    if ((ret = ec->put(i_num, std::string(), r)) != extent_protocol::OK)
+    if (ec->put(i_num, std::string(), r) != extent_protocol::OK)
         return IOERR;
     i_num = static_cast<inum>(static_cast<unsigned int>(r));
-//    inum re = static_cast<inum>(static_cast<unsigned int>(r));
-//    printf("create\nset %016llx\nget %016llx\n", i_num, re);
     if (i_num == 0x80000000){
         return IOERR;
     }else{
         std::string buf;
-        if ((ret = ec->get(parent, buf)) != extent_protocol::OK){
-            return IOERR;
+        if (ec->get(parent, buf) != extent_protocol::OK){
+            return NOENT;
         }
         buf += (to_dir_entry(name, i_num) + entry_delimiter);
-        if ((ret = ec->put(parent, buf)) != extent_protocol::OK){
+        if (ec->put(parent, buf) != extent_protocol::OK){
             return IOERR;
         }
-        fflush(stdout);
         return OK;
     }
+}
+
+int yfs_client::mkdir(inum parent, std::string name, inum &i_num){
+	i_num = 0x00000000;
+	int r = static_cast<int>(i_num);
+	if (ec->put(i_num, std::string(), r) != extent_protocol::OK){
+		return IOERR;
+	}
+	i_num = static_cast<inum>(static_cast<unsigned int>(r));
+	if (i_num == 0x00000000){
+		return IOERR;
+	}else{
+		std::string buf;
+		if (ec->get(parent, buf) != extent_protocol::OK){
+			return NOENT;
+		}
+		buf += (to_dir_entry(name, i_num) + entry_delimiter);
+		if (ec->put(parent, buf) != extent_protocol::OK){
+			return IOERR;
+		}
+	}
+	return OK;
 }
 
 int yfs_client::read_file(inum i_num, std::string &buf, off_t off, size_t &size){
@@ -231,6 +249,26 @@ int yfs_client::read_dir(inum i_num, std::map<std::string, inum> &entries){
         return IOERR;
     get_dir_entries(content, entries);
     return ret;
+}
+
+int yfs_client::unlink(inum parent, std::string name){
+	std::string content;
+	std::map<std::string, inum> entries;
+	if (ec->get(parent, content) != extent_protocol::OK){
+		return IOERR;
+	}
+	get_dir_entries(content, entries);
+	std::map<std::string, inum>::iterator it;
+	if ((it = entries.find(name)) == entries.end()){
+		return NOENT;
+	}else{
+		entries.erase(it);
+		get_dir_content(entries, content);
+		if (ec->put(parent, content) != extent_protocol::OK)
+			return IOERR;
+		return OK;
+	}
+
 }
 
 int yfs_client::resize(inum i_num, size_t size){

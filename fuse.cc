@@ -123,7 +123,7 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 {
   printf("fuseserver_setattr 0x%x\n", to_set);
   if (FUSE_SET_ATTR_SIZE & to_set) {
-    printf("   fuseserver_setattr set size to %zu\n", attr->st_size);
+    printf("   fuseserver_setattr set size to %zu\n", static_cast<size_t>(attr->st_size));
     struct stat st;
 #if 1
 
@@ -225,9 +225,9 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
     e->generation = 0;
     int ret = yfs_client::OK;
     yfs_client::inum i_num;
-    if (yfs->look_up_by_name(static_cast<yfs_client::inum>(parent), name, i_num) == yfs_client::OK){
+    if ((ret = yfs->look_up_by_name(static_cast<yfs_client::inum>(parent), name, i_num)) == yfs_client::OK){
         return yfs_client::EXIST;
-    }else{
+    }else if (ret == yfs_client::NOENT){
         if((ret = yfs->create_file(static_cast<yfs_client::inum>(parent), name, i_num)) == yfs_client::OK){
             e->ino = static_cast<fuse_ino_t>(i_num);
             ret = getattr(i_num, e->attr);
@@ -238,7 +238,7 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
             return ret;
         }
     }
-    return yfs_client::OK;
+    return ret;
 }
 
 void
@@ -389,19 +389,40 @@ void
 fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
      mode_t mode)
 {
-  struct fuse_entry_param e;
-  // In yfs, timeouts are always set to 0.0, and generations are always set to 0
-  e.attr_timeout = 0.0;
-  e.entry_timeout = 0.0;
-  e.generation = 0;
-  // Suppress compiler warning of unused e.
-  (void) e;
-
-  // You fill this in for Lab 3
-#if 0
-  fuse_reply_entry(req, &e);
+	struct fuse_entry_param e;
+	// In yfs, timeouts are always set to 0.0, and generations are always set to 0
+	e.attr_timeout = 0.0;
+	e.entry_timeout = 0.0;
+	e.generation = 0;
+	// Suppress compiler warning of unused e.
+	//  (void) e;
+	int ret = yfs_client::OK;
+	yfs_client::inum i_num;
+	if ((ret = yfs->look_up_by_name(static_cast<yfs_client::inum>(parent), name, i_num)) == yfs_client::NOENT){
+		ret = yfs->mkdir(static_cast<yfs_client::inum>(parent), name, i_num);
+		if (ret != yfs_client::OK){
+			fuse_reply_err(req, ENOENT);
+			return;
+		}else{
+			e.ino = static_cast<fuse_ino_t>(i_num);
+			ret = getattr(i_num, e.attr);	
+			if (ret != yfs_client::OK){
+				fuse_reply_err(req, ENOENT);
+				return;
+			}
+		}
+	}else if (ret == yfs_client::OK){
+		fuse_reply_err(req, EEXIST);
+		return;
+	}else{
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+ 
+#if 1
+	fuse_reply_entry(req, &e);
 #else
-  fuse_reply_err(req, ENOSYS);
+	fuse_reply_err(req, ENOSYS);
 #endif
 }
 
@@ -416,10 +437,12 @@ void
 fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
 
-  // You fill this in for Lab 3
   // Success:	fuse_reply_err(req, 0);
   // Not found:	fuse_reply_err(req, ENOENT);
-  fuse_reply_err(req, ENOSYS);
+	if (yfs->unlink(static_cast<yfs_client::inum>(parent), name) == yfs_client::OK)
+		fuse_reply_err(req, 0);
+	else
+		fuse_reply_err(req, ENOENT);	
 }
 
 void
