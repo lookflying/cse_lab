@@ -131,12 +131,9 @@ int
 yfs_client::getdir(inum inum, dirinfo &din)
 {
   int r = OK;
-<<<<<<< HEAD
   // You modify this function for Lab 3
   // - hold and release the directory lock
 
-=======
->>>>>>> lab2
   printf("getdir %016llx\n", inum);
   extent_protocol::attr a;
   if (ec->getattr(inum, a) != extent_protocol::OK) {
