@@ -6,7 +6,7 @@
 #include <string>
 #include <map>
 #include "extent_protocol.h"
-
+#include <pthread.h>
 class extent_server {
 
  public:
@@ -16,6 +16,13 @@ class extent_server {
   int get(extent_protocol::extentid_t id, std::string &);
   int getattr(extent_protocol::extentid_t id, extent_protocol::attr &);
   int remove(extent_protocol::extentid_t id, int &);
+
+private:
+    std::map<extent_protocol::extentid_t, extent_protocol::attr> attr_;
+	std::map<extent_protocol::extentid_t, std::string> data_;
+	pthread_mutex_t mutex_;
+
+
 };
 
 #endif 
