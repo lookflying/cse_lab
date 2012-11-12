@@ -17,8 +17,12 @@ private:
 	pthread_mutex_t	locks_mutex_;
 	pthread_cond_t	locks_cond_;
 
-	std::map<lock_protocol::lockid_t, std::queue<std::string> > wating_list_;
+	pthread_t reversed_rpc_thread_;
+	bool alive_;
+	std::map<lock_protocol::lockid_t, std::queue<std::string> > waiting_list_;
 	typedef	std::map<lock_protocol::lockid_t, std::queue<std::string> >::iterator waiting_list_iterator_t;
+	std::queue<lock_protocol::lockid_t> revoke_queue_;
+	std::queue<lock_protocol::lockid_t> retry_queue_;
 	pthread_mutex_t	waiting_list_mutex_;
 	pthread_cond_t	waiting_list_cond_;
 	//must be called with locks_mutex_ locked
@@ -27,9 +31,12 @@ private:
 	bool drop_lock(std::string cid, lock_protocol::lockid_t lid);
 public:
 	lock_server_cache();
+	~lock_server_cache();
 	lock_protocol::status stat(lock_protocol::lockid_t, int &);
 	int acquire(lock_protocol::lockid_t, std::string id, int &);
 	int release(lock_protocol::lockid_t, std::string id, int &);
+	void reversed_rpc_daemon();
+	lock_protocol::status reversed_rpc(unsigned int proc, std::string cid, lock_protocol::lockid_t lid);
 };
 
 #endif

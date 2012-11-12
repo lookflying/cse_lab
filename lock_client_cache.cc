@@ -63,15 +63,21 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
 rlock_protocol::status
 lock_client_cache::revoke_handler(lock_protocol::lockid_t lid, int &)
 {
-  int ret = rlock_protocol::OK;
-  return ret;
+	int ret = rlock_protocol::OK;
+	pthread_mutex_lock(&locks_mutex_);
+	locks_[lid] = RELEASING;
+	pthread_mutex_unlock(&locks_mutex_);
+	return ret;
 }
 
 rlock_protocol::status
 lock_client_cache::retry_handler(lock_protocol::lockid_t lid, int &)
 {
-  int ret = rlock_protocol::OK;
-  return ret;
+	int ret = rlock_protocol::OK;
+	pthread_mutex_lock(&locks_mutex_);
+	pthread_cond_broadcast(&locks_changed_);
+	pthread_mutex_unlock(&locks_mutex_);
+	return ret;
 }
 
 
@@ -110,6 +116,8 @@ bool lock_client_cache::lock(lock_protocol::lockid_t lid){
 		if (rst == lock_protocol::OK){
 			locks_[lid] = LOCKED;
 			ret = true;
+		}else if (rst == lock_protocol::RETRY){
+			//
 		}
 	}
 	return ret;
@@ -138,7 +146,7 @@ bool lock_client_cache::unlock(lock_protocol::lockid_t lid){
 	if (revoked){
 		lock_protocol::status rst;
 		int r;
-		rst = cl->call(lock_protocol::release, id, lid, r);
+		rst = cl->call(lock_protocol::release, lid, id, r);
 		if (rst == lock_protocol::OK){
 			locks_[lid] = NONE;
 			ret = true;

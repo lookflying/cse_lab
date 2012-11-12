@@ -9,18 +9,43 @@
 #include "handle.h"
 #include "tprintf.h"
 
-static void* reverse_rpc(void *){
+static void* reversed_rpc(void * lsc_ptr){
+	lock_server_cache *lsc = (lock_server_cache*)lsc_ptr;
+	lsc->reversed_rpc_daemon();
 	return (void*)0;
 }
+
+
+
 lock_server_cache::lock_server_cache()
 {
 	VERIFY(pthread_mutex_init(&locks_mutex_, NULL) == 0);
 	VERIFY(pthread_cond_init(&locks_cond_, NULL) == 0);
 	VERIFY(pthread_mutex_init(&waiting_list_mutex_, NULL) == 0);
 	VERIFY(pthread_cond_init(&waiting_list_cond_, NULL) == 0);
-	
+	//alive_ = true;
+	//pthread_create(&reversed_rpc_thread_, NULL, reversed_rpc, (void*)this);
 }
 
+lock_server_cache::~lock_server_cache(){
+//	alive_ = false;
+//	pthread_cancel(reversed_rpc_thread_);
+
+}
+
+void lock_server_cache::reversed_rpc_daemon(){
+	if (alive_){
+		pthread_mutex_lock(&waiting_list_mutex_);
+		while(alive_ ){
+			pthread_cond_wait(&waiting_list_cond_, &waiting_list_mutex_);
+			while(!revoke_queue_.empty()){
+			}
+
+		}
+		pthread_mutex_unlock(&waiting_list_mutex_);	
+	}
+	
+}
 bool lock_server_cache::get_lock(std::string cid, lock_protocol::lockid_t lid){
 	bool ret = true;
 	locks_iterator_t it = locks_.find(lid);
@@ -54,6 +79,8 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id, int 
 	pthread_mutex_lock(&locks_mutex_);
 	if (!get_lock(id, lid)){
 		ret = lock_protocol::RETRY;
+		waiting_list_[lid].push(id);
+		VERIFY(reversed_rpc(rlock_protocol::revoke, locks_[lid], lid) == rlock_protocol::OK);
 	}
 	pthread_mutex_unlock(&locks_mutex_);
 	return ret;
@@ -66,6 +93,13 @@ lock_server_cache::release(lock_protocol::lockid_t lid, std::string id, int &r)
 	pthread_mutex_lock(&locks_mutex_);
 	if (!drop_lock(id, lid)){
 		ret = lock_protocol::RETRY; 
+	}else{
+		std::queue<std::string>* queue = &waiting_list_[lid];
+		while(!queue->empty()){
+			VERIFY(reversed_rpc(rlock_protocol::retry, queue->front(), lid) == rlock_protocol::OK);
+			queue->pop();
+		}
+
 	}
 	pthread_mutex_unlock(&locks_mutex_);
 	return ret;
@@ -79,3 +113,12 @@ lock_server_cache::stat(lock_protocol::lockid_t lid, int &r)
 	return lock_protocol::OK;
 }
 
+lock_protocol::status lock_server_cache::reversed_rpc(unsigned int proc, std::string cid, lock_protocol::lockid_t lid){
+	handle h(cid);
+	lock_protocol::status ret;
+	if (h.safebind()){
+		int r;
+		ret = h.safebind()->call(proc, lid, r);
+	}
+	return ret;
+}
