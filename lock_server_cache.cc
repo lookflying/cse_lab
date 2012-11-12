@@ -9,43 +9,16 @@
 #include "handle.h"
 #include "tprintf.h"
 
-static void* reversed_rpc(void * lsc_ptr){
-	lock_server_cache *lsc = (lock_server_cache*)lsc_ptr;
-	lsc->reversed_rpc_daemon();
-	return (void*)0;
-}
-
-
-
 lock_server_cache::lock_server_cache()
 {
 	VERIFY(pthread_mutex_init(&locks_mutex_, NULL) == 0);
 	VERIFY(pthread_cond_init(&locks_cond_, NULL) == 0);
-	VERIFY(pthread_mutex_init(&waiting_list_mutex_, NULL) == 0);
-	VERIFY(pthread_cond_init(&waiting_list_cond_, NULL) == 0);
-	//alive_ = true;
-	//pthread_create(&reversed_rpc_thread_, NULL, reversed_rpc, (void*)this);
 }
 
 lock_server_cache::~lock_server_cache(){
-//	alive_ = false;
-//	pthread_cancel(reversed_rpc_thread_);
 
 }
 
-void lock_server_cache::reversed_rpc_daemon(){
-	if (alive_){
-		pthread_mutex_lock(&waiting_list_mutex_);
-		while(alive_ ){
-			pthread_cond_wait(&waiting_list_cond_, &waiting_list_mutex_);
-			while(!revoke_queue_.empty()){
-			}
-
-		}
-		pthread_mutex_unlock(&waiting_list_mutex_);	
-	}
-	
-}
 bool lock_server_cache::get_lock(std::string cid, lock_protocol::lockid_t lid){
 	bool ret = true;
 	locks_iterator_t it = locks_.find(lid);
@@ -78,9 +51,26 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id, int 
 	lock_protocol::status ret = lock_protocol::OK;
 	pthread_mutex_lock(&locks_mutex_);
 	if (!get_lock(id, lid)){
-		ret = lock_protocol::RETRY;
-		waiting_list_[lid].push(id);
-		VERIFY(reversed_rpc(rlock_protocol::revoke, locks_[lid], lid) == rlock_protocol::OK);
+		rlock_protocol::status rst;
+		rst = reversed_rpc(rlock_protocol::revoke, locks_[lid], lid);
+		tprintf("revoke %s\n", locks_[lid].c_str());
+		if (rst == rlock_protocol::OK_FREE){
+			VERIFY(drop_lock(locks_[lid], lid));
+			VERIFY(get_lock(id, lid));
+
+			
+			tprintf("%s got_lock %lld\n", id.c_str(), lid);
+
+		}else{
+			VERIFY(rst == rlock_protocol::OK);
+			ret = lock_protocol::RETRY;
+			waiting_list_[lid].push(id);
+
+			tprintf("%s fail_to_got_lock %lld\n", id.c_str(), lid);
+
+		}
+	}else{
+		tprintf("%s got_lock %lld\n", id.c_str(), lid);
 	}
 	pthread_mutex_unlock(&locks_mutex_);
 	return ret;
@@ -93,7 +83,10 @@ lock_server_cache::release(lock_protocol::lockid_t lid, std::string id, int &r)
 	pthread_mutex_lock(&locks_mutex_);
 	if (!drop_lock(id, lid)){
 		ret = lock_protocol::RETRY; 
+
+		tprintf("%s fail to released %lld\n", id.c_str(), lid);
 	}else{
+		tprintf("%s released %lld\n", id.c_str(), lid);
 		std::queue<std::string>* queue = &waiting_list_[lid];
 		while(!queue->empty()){
 			VERIFY(reversed_rpc(rlock_protocol::retry, queue->front(), lid) == rlock_protocol::OK);
