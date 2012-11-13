@@ -52,8 +52,10 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id, int 
 	pthread_mutex_lock(&locks_mutex_);
 	if (!get_lock(id, lid)){
 		rlock_protocol::status rst;
-		rst = reversed_rpc(rlock_protocol::revoke, locks_[lid], lid);
-		tprintf("revoke %s\n", locks_[lid].c_str());
+		do{
+			rst = reversed_rpc(rlock_protocol::revoke, locks_[lid], lid);
+		}while(!(rst == rlock_protocol::OK || rst == rlock_protocol::OK_FREE));
+		tprintf("revoke %s lock %lld\n", locks_[lid].c_str(), lid);
 		if (rst == rlock_protocol::OK_FREE){
 			VERIFY(drop_lock(locks_[lid], lid));
 			VERIFY(get_lock(id, lid));
@@ -89,7 +91,11 @@ lock_server_cache::release(lock_protocol::lockid_t lid, std::string id, int &r)
 		tprintf("%s released %lld\n", id.c_str(), lid);
 		std::queue<std::string>* queue = &waiting_list_[lid];
 		while(!queue->empty()){
-			VERIFY(reversed_rpc(rlock_protocol::retry, queue->front(), lid) == rlock_protocol::OK);
+			rlock_protocol::status rst;
+			do{
+				rst = reversed_rpc(rlock_protocol::retry, queue->front(), lid);
+			}while(rst != rlock_protocol::OK);
+			tprintf("send retry to %s for lock %lld\n", queue->front().c_str(), lid);
 			queue->pop();
 		}
 
@@ -109,9 +115,10 @@ lock_server_cache::stat(lock_protocol::lockid_t lid, int &r)
 lock_protocol::status lock_server_cache::reversed_rpc(unsigned int proc, std::string cid, lock_protocol::lockid_t lid){
 	handle h(cid);
 	lock_protocol::status ret;
-	if (h.safebind()){
+	rpcc* rrpc = h.safebind();
+	if (rrpc != NULL){
 		int r;
-		ret = h.safebind()->call(proc, lid, r);
+		ret = rrpc->call(proc, lid, r);
 	}
 	return ret;
 }

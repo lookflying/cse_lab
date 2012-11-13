@@ -51,7 +51,7 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
 	lock_protocol::status ret = lock_protocol::OK;
 	pthread_mutex_lock(&locks_mutex_);
 	if (unlock(lid)){
-		pthread_cond_signal(&locks_changed_);
+		pthread_cond_broadcast(&locks_changed_);
 	}else{
 		ret = lock_protocol::RETRY;
 	}
@@ -65,15 +65,16 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid, int &)
 {
 	int ret = rlock_protocol::OK;
 	pthread_mutex_lock(&locks_mutex_);
+	tprintf("%s got revoke %lld\n", id.c_str(), lid);
 	if (locks_[lid] == LOCKED){
 		locks_[lid] = RELEASING;
 		pthread_cond_broadcast(&locks_changed_);
 	}else if (locks_[lid] == FREE){
 		ret = rlock_protocol::OK_FREE;
 		locks_[lid] = NONE;
+		tprintf("%s released lock %lld\n", id.c_str(), lid);
 	}
 	pthread_mutex_unlock(&locks_mutex_);
-	tprintf("%s got revoke %lld\n", id.c_str(), lid);
 	return ret;
 }
 
