@@ -178,8 +178,7 @@ bool lock_client_cache::lock(lock_protocol::lockid_t lid){
 		}else if (rst == lock_protocol::RETRY){
 			//
 		}
-		tprintf("%s lock %lld", id.c_str(), lid);
-		printf(" %s\n", ret?"success":"fail");
+		tprintf("%s lock %lld %s\n", id.c_str(), lid, ret?"success":"fail");
 	}
 //	tprintf("%s lock %lld", id.c_str(), lid);
 //	printf(" %s\n", ret?"success":"fail");
@@ -215,8 +214,8 @@ bool lock_client_cache::unlock(lock_protocol::lockid_t lid){
 	if (revoked){
 		lock_protocol::status rst;
 		int r;
+		int i = 0;
 		do{
-			static int i = 0;
 			rst = cl->call(lock_protocol::release, lid, id, r);
 			tprintf("%s try release lock %lld for %d time\n", id.c_str(), lid, ++i);
 		}while(rst != lock_protocol::OK);
@@ -225,8 +224,7 @@ bool lock_client_cache::unlock(lock_protocol::lockid_t lid){
 		set_lock_status(lid, NONE);
 		ret = true;
 //		}
-		tprintf("%s unlock %lld", id.c_str(), lid);
-		printf(" %s\n", ret?"success":"fail");
+		tprintf("%s unlock %lld %s \n", id.c_str(), lid, ret?"success":"fail");
 	}
 	
 //	tprintf("%s unlock %lld", id.c_str(), lid);
