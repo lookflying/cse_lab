@@ -31,27 +31,30 @@ private:
 	int rlock_port;
 	std::string hostname;
 	std::string id;
+	pthread_t default_owner_;
 	
 	typedef struct lock_info{
 		lock_status_t status_;
 		pthread_t	owner_;
 		pthread_cond_t	cond_;
+		int append_;
+		bool revoked_;
 	}lock_info_t;
 
 	std::map<lock_protocol::lockid_t, lock_info_t> locks_;
-//	std::map<lock_protocol::lockid_t, lock_status_t> locks_;
-//	std::map<lock_protocol::lockid_t, pthread_t> locks_owners_;
 	pthread_mutex_t locks_mutex_;
-//	pthread_cond_t	locks_changed_;
-	
-	//pthread_mutex_t locks_remote_mutex_;
-	//pthread_cond_t	locks_remote_cond_;
 	
 	//functions below must be called with locks_mutex_ locked 
 	lock_status_t get_lock_status(lock_protocol::lockid_t lid);
+		//fuctions below must be called after the lock is touched by get_lock_status
 	bool is_lock_owner(lock_protocol::lockid_t lid, pthread_t owner);	
+	bool lock_has_appending(lock_protocol::lockid_t lid);
+	bool is_lock_revoked(lock_protocol::lockid_t lid);
+	void inc_lock_appending(lock_protocol::lockid_t lid);
+	void dec_lock_appending(lock_protocol::lockid_t lid);
 	void set_lock_status(lock_protocol::lockid_t lid, lock_status_t status);	
 	void set_lock_owner(lock_protocol::lockid_t lid, pthread_t owner);
+	void set_lock_revoked(lock_protocol::lockid_t lid); 
 	#define lock_cond_wait(lid, mutex) pthread_cond_wait(&locks_[(lid)].cond_, &(mutex))  
 	#define lock_cond_broadcast(lid) pthread_cond_broadcast(&locks_[(lid)].cond_)
 	bool lock(lock_protocol::lockid_t lid);
