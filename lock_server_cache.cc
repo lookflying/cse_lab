@@ -114,7 +114,7 @@ lock_server_cache::stat(lock_protocol::lockid_t lid, int &r)
 
 lock_protocol::status lock_server_cache::reversed_rpc(unsigned int proc, std::string cid, lock_protocol::lockid_t lid){
 	handle h(cid);
-	lock_protocol::status ret;
+	lock_protocol::status ret = lock_protocol::RPCERR;
 	rpcc* rrpc = h.safebind();
 	if (rrpc != NULL){
 		int r;

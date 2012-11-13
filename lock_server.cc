@@ -62,11 +62,11 @@ lock_protocol::status lock_server::release(int clt, lock_protocol::lockid_t lid,
         ret = lock_protocol::RETRY;
     }
     pthread_mutex_unlock(&lock_map_mutex_);
-//    if (r == 0){
-//        printf("client %d release %ld success\n", clt, lid);
-//    }else{
-//        printf("client %d release %ld fail\n", clt, lid);
-//    }
+    if (r == 0){
+        printf("client %d release %lld success\n", clt, lid);
+    }else{
+        printf("client %d release %lld fail\n", clt, lid);
+    }
     return ret;
 }
 

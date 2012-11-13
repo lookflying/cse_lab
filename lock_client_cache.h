@@ -32,20 +32,31 @@ private:
 	std::string hostname;
 	std::string id;
 	
-	std::map<lock_protocol::lockid_t, lock_status_t> locks_;
+	typedef struct lock_info{
+		lock_status_t status_;
+		pthread_t	owner_;
+		pthread_cond_t	cond_;
+	}lock_info_t;
+
+	std::map<lock_protocol::lockid_t, lock_info_t> locks_;
+//	std::map<lock_protocol::lockid_t, lock_status_t> locks_;
+//	std::map<lock_protocol::lockid_t, pthread_t> locks_owners_;
 	pthread_mutex_t locks_mutex_;
-	pthread_cond_t	locks_changed_;
+//	pthread_cond_t	locks_changed_;
 	
 	//pthread_mutex_t locks_remote_mutex_;
 	//pthread_cond_t	locks_remote_cond_;
 	
-	//must be called with locks_mutex_ locked 
+	//functions below must be called with locks_mutex_ locked 
 	lock_status_t get_lock_status(lock_protocol::lockid_t lid);
-	
-	//must be called with locks_mutex_ locked 
+	bool is_lock_owner(lock_protocol::lockid_t lid, pthread_t owner);	
+	void set_lock_status(lock_protocol::lockid_t lid, lock_status_t status);	
+	void set_lock_owner(lock_protocol::lockid_t lid, pthread_t owner);
+	#define lock_cond_wait(lid, mutex) pthread_cond_wait(&locks_[(lid)].cond_, &(mutex))  
+	#define lock_cond_broadcast(lid) pthread_cond_broadcast(&locks_[(lid)].cond_)
 	bool lock(lock_protocol::lockid_t lid);
-	//must be called with locks_mutex_ locked 
 	bool unlock(lock_protocol::lockid_t lid);
+	//functions above must be called with locks_mutex_ locked
 public:
 
 	lock_client_cache(std::string xdst, class lock_release_user *l = 0);
