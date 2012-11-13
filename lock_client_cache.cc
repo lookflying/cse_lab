@@ -80,8 +80,10 @@ rlock_protocol::status
 lock_client_cache::retry_handler(lock_protocol::lockid_t lid, int &)
 {
 	int ret = rlock_protocol::OK;
+	pthread_mutex_lock(&locks_mutex_);
 	lock_cond_broadcast(lid);
 	tprintf("%s got retry %lld\n", id.c_str(), lid);
+	pthread_mutex_unlock(&locks_mutex_);
 	return ret;
 }
 
@@ -157,7 +159,7 @@ bool lock_client_cache::lock(lock_protocol::lockid_t lid){
 		do{
 			rst = cl->call(lock_protocol::acquire, lid, id, r);
 			tprintf("%s try get lock %lld for %d time\n", id.c_str(), lid, ++i);
-		}while(!(rst == lock_protocol::OK));
+		}while(!(rst == lock_protocol::OK || rst == lock_protocol::RETRY));
 		pthread_mutex_lock(&locks_mutex_);
 		if (rst == lock_protocol::OK){
 			set_lock_status(lid, LOCKED);
