@@ -159,10 +159,15 @@ bool lock_client_cache::lock(lock_protocol::lockid_t lid){
 			tprintf("%s try get lock %lld for %d time\n", id.c_str(), lid, ++i);
 		}while(!(rst == lock_protocol::OK));
 		pthread_mutex_lock(&locks_mutex_);
-		VERIFY(rst == lock_protocol::OK);
-		set_lock_status(lid, LOCKED);
-		set_lock_owner(lid, pthread_self());
-		ret = true;
+		if (rst == lock_protocol::OK){
+			set_lock_status(lid, LOCKED);
+			set_lock_owner(lid, pthread_self());
+			ret = true;
+		}else if(rst == lock_protocol::RETRY){
+			set_lock_status(lid, NONE);
+			set_lock_owner(lid, default_owner_);
+			ret = false;
+		}
 		tprintf("%s lock %lld %s\n", id.c_str(), lid, ret?"success":"fail");
 	}
 //	tprintf("%s lock %lld %s locally\n", id.c_str(), lid, ret?"success":"fail");
