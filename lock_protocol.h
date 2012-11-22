@@ -27,4 +27,9 @@ class rlock_protocol {
     retry = 0x8002
   };
 };
+
+class lock_protocol_failure_code{
+public:
+	enum codes{LOCK_BUSY = 0x9001, NOT_NEXT};
+};
 #endif 

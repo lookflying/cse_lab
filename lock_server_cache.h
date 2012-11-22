@@ -26,8 +26,8 @@ public:
 	lock_server_cache();
 	~lock_server_cache();
 	lock_protocol::status stat(lock_protocol::lockid_t, int &);
-	int acquire(lock_protocol::lockid_t, std::string id, int &);
-	int release(lock_protocol::lockid_t, std::string id, int &);
+	int acquire(lock_protocol::lockid_t, std::string id, int &r);
+	int release(lock_protocol::lockid_t, std::string id, int &r);
 	lock_protocol::status reversed_rpc(unsigned int proc, std::string cid, lock_protocol::lockid_t lid);
 };
 
