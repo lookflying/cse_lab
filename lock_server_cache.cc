@@ -87,6 +87,13 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id, int 
 			VERIFY(waiting_list_[lid].front().compare(id) == 0);
 			waiting_list_[lid].pop();
 			tprintf("%s popped from waiting list of lock %lld\n", id.c_str(), lid);
+			//need be revoked if queue is already not empty
+			tprintf("send revoke to %s for lock %lld\n", locks_[lid].c_str(), lid);
+			rlock_protocol::status rst;
+			do{
+				rst = reversed_rpc(rlock_protocol::revoke, locks_[lid], lid);
+			}while(!(rst == rlock_protocol::OK || rst == rlock_protocol::OK_FREE));
+
 		}
 		tprintf("%s got_lock %lld\n", id.c_str(), lid);
 	}

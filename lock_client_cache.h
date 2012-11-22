@@ -39,6 +39,7 @@ private:
 		pthread_cond_t	cond_;
 		int append_;
 		bool revoked_;
+		bool retry_;
 	}lock_info_t;
 
 	std::map<lock_protocol::lockid_t, lock_info_t> locks_;
@@ -50,12 +51,14 @@ private:
 	bool is_lock_owner(lock_protocol::lockid_t lid, pthread_t owner);	
 	bool lock_has_appending(lock_protocol::lockid_t lid);
 	bool is_lock_revoked(lock_protocol::lockid_t lid);
+	bool lock_should_retry(lock_protocol::lockid_t lid);
 	void inc_lock_appending(lock_protocol::lockid_t lid);
 	void dec_lock_appending(lock_protocol::lockid_t lid);
 	void set_lock_status(lock_protocol::lockid_t lid, lock_status_t status);	
 	void set_lock_owner(lock_protocol::lockid_t lid, pthread_t owner);
 	void set_lock_revoked(lock_protocol::lockid_t lid); 
 	void forget_lock(lock_protocol::lockid_t lid);
+	void set_lock_retry(lock_protocol::lockid_t lid);
 	#define lock_cond_wait(lid, mutex) pthread_cond_wait(&locks_[(lid)].cond_, &(mutex))  
 	#define lock_cond_broadcast(lid) pthread_cond_broadcast(&locks_[(lid)].cond_)
 	bool lock(lock_protocol::lockid_t lid);

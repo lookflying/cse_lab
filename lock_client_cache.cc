@@ -33,7 +33,9 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
 	if (!lock(lid)){
 		inc_lock_appending(lid);
 		while(true){
-			lock_cond_wait(lid, locks_mutex_);
+			if(!lock_should_retry(lid)){
+				lock_cond_wait(lid, locks_mutex_);
+			}
 			if (lock(lid)){
 				break;
 			}
@@ -87,6 +89,7 @@ lock_client_cache::retry_handler(lock_protocol::lockid_t lid, int &)
 	int ret = rlock_protocol::OK;
 	pthread_mutex_lock(&locks_mutex_);
 	lock_cond_broadcast(lid);
+	set_lock_retry(lid);
 	tprintf("%s got retry %lld\n", id.c_str(), lid);
 	pthread_mutex_unlock(&locks_mutex_);
 	return ret;
@@ -99,8 +102,9 @@ lock_client_cache::get_lock_status(lock_protocol::lockid_t lid){
 		locks_[lid].status_ = NONE;
 		locks_[lid].owner_ = default_owner_;
 		VERIFY(pthread_cond_init(&locks_[lid].cond_, NULL) == 0);
-//		locks_[lid].append_ = 0;
+		locks_[lid].append_ = 0;
 		locks_[lid].revoked_ = false;
+		locks_[lid].retry_ = false;
 	}
 	return locks_[lid].status_;
 }
@@ -131,6 +135,16 @@ void lock_client_cache::dec_lock_appending(lock_protocol::lockid_t lid){
 	tprintf("%s dec_lock_appending lock %lld before %d now %d by thread %u\n",id.c_str(), lid, locks_[lid].append_ + 1, locks_[lid].append_, (unsigned int)pthread_self());
 }
 
+bool lock_client_cache::lock_should_retry(lock_protocol::lockid_t lid){
+	bool ret = locks_[lid].retry_;
+	locks_[lid].retry_ = false;
+	return ret;
+}
+
+void lock_client_cache::set_lock_retry(lock_protocol::lockid_t lid){
+	locks_[lid].retry_ = true;
+}
+
 void lock_client_cache::set_lock_status(lock_protocol::lockid_t lid, lock_status_t status){
 	locks_[lid].status_ = status;
 }
@@ -142,6 +156,7 @@ void lock_client_cache::forget_lock(lock_protocol::lockid_t lid){
 	tprintf("%s reset lock %lld before %d now 0 by thread %u\n",id.c_str(), lid, locks_[lid].append_, (unsigned int)pthread_self());
 	locks_[lid].append_ = 0;
 	locks_[lid].revoked_ = false;
+	locks_[lid].retry_ = false;
 	
 }
 
