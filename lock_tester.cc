@@ -100,11 +100,14 @@ test3(void *x)
 
   printf ("test3: client %d acquire a release a concurrent\n", i);
   for (int j = 0; j < 10; j++) {
+    printf ("test3: client %d acquire lock\n", i);
     lc[i]->acquire(a);
     check_grant(a);
     printf ("test3: client %d got lock\n", i);
     check_release(a);
     lc[i]->release(a);
+	printf ("test3: client %d released lock\n", i);
+
   }
   return 0;
 }

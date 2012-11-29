@@ -46,6 +46,13 @@ extent_client::put(extent_protocol::extentid_t eid, std::string buf)
 }
 
 extent_protocol::status
+extent_client::put(extent_protocol::extentid_t eid, std::string buf, int &rid){
+    extent_protocol::status ret = extent_protocol::OK;
+    ret = cl->call(extent_protocol::put, eid, buf, rid);
+    return ret;
+}
+
+extent_protocol::status
 extent_client::remove(extent_protocol::extentid_t eid)
 {
   extent_protocol::status ret = extent_protocol::OK;
