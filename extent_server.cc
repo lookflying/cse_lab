@@ -24,11 +24,11 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int & r)
         old = false;
 
         do{
-#if RAND_MAX == 2147483647
+			#if RAND_MAX == 2147483647
             id = (rand() & 0x7fffffff) | (id & 0x80000000);
-#else
+			#else
             id = (((rand() & 0x7fff) << 16) | (rand() & 0xffff)) | (id & 0x80000000);
-#endif
+			#endif
         }while(attr_.find(id) != attr_.end());
 
     }else if (attr_.find(id) != attr_.end()){

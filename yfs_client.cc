@@ -25,7 +25,7 @@ yfs_client::yfs_client(std::string extent_dst, std::string lock_dst)
 //      rootcontent << delimiter;
 //      rootcontent << rootid << entry_delimiter;
 //      VERIFY(ec->put(rootid, rootcontent.str()) == extent_protocol::OK);
-	VERIFY(ec->put(rootid, std::string()) == extent_protocol::OK);
+		VERIFY(ec->put(rootid, std::string()) == extent_protocol::OK);
 	}else{
 		VERIFY(s == extent_protocol::OK);
 	}
@@ -123,9 +123,6 @@ int
 yfs_client::getfile(inum inum, fileinfo &fin)
 {
 	int r = OK;
-  // You modify this function for Lab 3
-  // - hold and release the file lock
-
 	printf("getfile %016llx\n", inum);
 	lock(inum);
 	extent_protocol::attr a;
@@ -149,8 +146,6 @@ int
 yfs_client::getdir(inum inum, dirinfo &din)
 {
 	int r = OK;
-  // You modify this function for Lab 3
-  // - hold and release the directory lock
 	printf("getdir %016llx\n", inum);
 	lock(inum);
 	extent_protocol::attr a;
@@ -327,9 +322,14 @@ int yfs_client::unlink(inum parent, std::string name){
 		ret = NOENT;
 		goto release;
 	}else{
+		extent_protocol::extentid_t to_remove = static_cast<extent_protocol::extentid_t>(it->second);
 		entries.erase(it);
 		get_dir_content(entries, content);
 		if (ec->put(static_cast<extent_protocol::extentid_t>(parent), content) != extent_protocol::OK){
+			ret = IOERR;
+			goto release;
+		}
+		if (ec->remove(to_remove) != extent_protocol::OK){
 			ret = IOERR;
 			goto release;
 		}
