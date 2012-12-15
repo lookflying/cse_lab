@@ -40,7 +40,7 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int & r)
 	if (!old){
 		attr_[id].ctime = t;
 	}
-    attr_[id].atime = 0;
+    attr_[id].atime = t;
 	attr_[id].mtime = t;
     attr_[id].size = buf.size();
     pthread_mutex_unlock(&mutex_);
